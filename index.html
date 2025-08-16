@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light" data-scale="1" data-dense="0" style="--col-min:150px;">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Yam’s — Feuille de score</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" href="favicon.ico" sizes="any">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Error Overlay -->
+  <div id="errOverlay" aria-hidden="true">
+    <div id="errBox" role="alertdialog" aria-labelledby="errTitle" aria-describedby="errText">
+      <h3 id="errTitle">Oups — une erreur JavaScript a été détectée</h3>
+      <p>Tu peux vider le cache, copier le détail, puis recharger.</p>
+      <pre id="errText"></pre>
+      <div id="errActions">
+        <button id="btnCopy">Copier l’erreur</button>
+        <button id="btnClear">Vider le cache</button>
+        <button id="btnReload">Recharger</button>
+      </div>
+    </div>
+  </div>
+
+  <header>
+    <h1>Yam’s — Feuille de score</h1>
+    <div class="spacer"></div>
+    <button id="settingsBtn" class="settings-btn" title="Réglages" aria-haspopup="dialog" aria-controls="settingsModal">⚙︎</button>
+  </header>
+
+  <main>
+    <div class="toolbar">
+      <input id="playerName" placeholder="Nom du joueur" autocomplete="off" />
+      <button id="addPlayerBtn">Ajouter</button>
+      <button id="roundToggleBtn">Clôturer la manche</button>
+      <button id="openHistoryBtn" aria-haspopup="dialog" aria-controls="historyModal">Historique</button>
+    </div>
+
+    <section class="leaderboard" id="leaderboard">
+      <div class="lb-head">
+        <strong>Classement</strong>
+        <select id="lbView" aria-label="Vue classement">
+          <option value="current">Manche actuelle</option>
+          <option value="avg">Toutes les manches (moyenne)</option>
+          <option value="wins">Victoires</option>
+        </select>
+      </div>
+      <div class="lb-list" id="lbList"></div>
+    </section>
+
+    <div class="table-wrap">
+      <table id="scoreTable" aria-label="Tableau de scores">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <!-- PRINT VIEW -->
+  <div id="printView">
+    <h1>Yam’s — Rapport des scores</h1>
+    <h2>1) Classement</h2>
+    <div id="printLeaderboards"></div>
+    <h2>2) Totaux par partie (manches clôturées)</h2>
+    <div id="printRounds"></div>
+    <h2>3) Détail par manche (catégories × joueurs)</h2>
+    <div id="printRoundDetails"></div>
+    <h2>4) Fiches joueurs</h2>
+    <div id="printPlayers"></div>
+  </div>
+
+  <!-- Backdrop -->
+  <div id="backdrop" class="backdrop" aria-hidden="true"></div>
+
+  <!-- SETTINGS -->
+  <div id="settingsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+    <div class="close-line"><button id="closeSettings" class="ghost-btn" aria-label="Fermer">✕</button></div>
+    <h3 id="settingsTitle">Réglages</h3>
+    <div class="section">
+      <h4>Mode</h4>
+      <div class="radio-row">
+        <label><input type="radio" name="themeMode" value="auto"> Auto (appareil)</label>
+        <label><input type="radio" name="themeMode" value="light"> Clair</label>
+        <label><input type="radio" name="themeMode" value="dark"> Sombre</label>
+      </div>
+    </div>
+    <div class="section">
+      <h4>Affichage</h4>
+      <div class="row">
+        <label for="presetDisplay">Taille / compacité :</label>
+        <select id="presetDisplay">
+          <option value="standard">Standard</option>
+          <option value="serre">Serré</option>
+          <option value="tres-serre">Très serré</option>
+        </select>
+      </div>
+    </div>
+    <div class="section">
+      <h4>Données</h4>
+      <div class="actions">
+        <button id="exportBtn">Exporter (JSON)</button>
+        <button id="importBtn">Importer (JSON)</button>
+        <button id="exportPdfBtn">Exporter en PDF</button>
+        <button id="clearCacheBtn" class="danger-btn" title="Supprimer les caches et le service worker">Vider le cache</button>
+        <input id="importFile" class="hidden-input" type="file" accept="application/json" />
+      </div>
+    </div>
+    <div class="section"><div class="muted">Version : v7.5.1</div></div>
+  </div>
+
+  <!-- HISTORY -->
+  <div id="historyModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="historyTitle">
+    <div class="close-line"><button id="closeHistory" class="ghost-btn" aria-label="Fermer">✕</button></div>
+    <h3 id="historyTitle">Historique des manches</h3>
+    <div id="historyList" class="history-list"></div>
+    <div class="actions" style="margin-top:8px;"><button id="clearHistoryBtn" class="danger-btn">Effacer l’historique</button></div>
+  </div>
+
+  <!-- PLAYER STATS -->
+  <div id="playerStatsModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="playerStatsTitle">
+    <div class="close-line"><button id="closePlayerStats" class="ghost-btn" aria-label="Fermer">✕</button></div>
+    <h3 id="playerStatsTitle">Statistiques du joueur</h3>
+    <div id="playerStatsContent"></div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
