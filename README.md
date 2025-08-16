@@ -1,0 +1,1 @@
+Version v7.4.6 SAFE: 1re colonne (en-tête + cellules + Total) collée à gauche, suppression de la colonne Total à droite, fix inputs, SW 12.6.
