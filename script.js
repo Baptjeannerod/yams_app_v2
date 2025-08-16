@@ -1,8 +1,8 @@
-// Yam's v7.5.1 — 100% vanilla
+// script.js
+// Yam's v7.5.1 — 100% vanilla (correctifs iPhone double-tap/long-press + croix)
 (function(){
   'use strict';
 
-  // ------------------ Constants & Categories ------------------
   const VERSION = 'v7.5.1';
 
   const CATS_UPPER = [
@@ -24,29 +24,20 @@
   ];
   const ALL_CATS = [...CATS_UPPER, ...CATS_LOWER];
 
-  // ------------------ Storage Keys ------------------
   const STATE_KEY  = 'yams-state-v7.5.1';
   const ROUNDS_KEY = 'yams-rounds-v7.5.1';
   const THEME_KEY  = 'yams-theme-mode';
   const UI_KEY     = 'yams-ui-v7';
 
-  // ------------------ Helpers ------------------
   const $ = (sel, root=document) => root.querySelector(sel);
   const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
   const escapeHtml = (str) => String(str).replace(/[&<>\"']/g, (s)=>({"&":"&amp;","<":"&lt;","&gt":"&gt;","\"":"&quot;","'":"&#39;"}[s]));
-
   const canonicalName = (name) => (name||'').replace(/\s+/g,' ').trim().toLowerCase();
   const clamp = (v,min,max)=> Math.max(min, Math.min(max, v));
 
-  const deepClone = (obj) => JSON.parse(JSON.stringify(obj));
-
-  // ------------------ Error overlay ------------------
-  (function(){
-    const overlay = $('#errOverlay');
-    const txt = $('#errText');
-    const btnCopy = $('#btnCopy');
-    const btnClear = $('#btnClear');
-    const btnReload = $('#btnReload');
+  (function(){ // error overlay
+    const overlay = $('#errOverlay'), txt = $('#errText');
+    const btnCopy = $('#btnCopy'), btnClear = $('#btnClear'), btnReload = $('#btnReload');
     function showErr(message, source, lineno, colno, error){
       overlay.style.display = 'block';
       txt.textContent = [message, source?(' @ '+source+':'+lineno+':'+colno):'', error && error.stack ? ('\n'+error.stack) : ''].join(' ');
@@ -64,7 +55,6 @@
     btnReload?.addEventListener('click', ()=> location.reload());
   })();
 
-  // ------------------ Theme & UI preset ------------------
   const mql = window.matchMedia('(prefers-color-scheme: dark)');
   function applyTheme(mode){
     let theme = mode; if (mode === 'auto'){ theme = mql.matches ? 'dark' : 'light'; }
@@ -107,19 +97,15 @@
     }
   })();
 
-  // ------------------ State & Rounds ------------------
   function emptyScore(){ return { score: '', blocked: false }; }
 
   let state = loadState();
   let rounds = loadRounds();
 
   function loadState(){
-    // New model: { players: [{id,name}], scores: { [pid]: { [catKey]: {score, blocked} } } }
     let st = null;
     try{ st = JSON.parse(localStorage.getItem(STATE_KEY) || 'null'); }catch{}
     if (st && Array.isArray(st.players) && st.scores) return migrateState(st);
-
-    // Migration from older versions (players had p.scores as numbers/strings)
     try{
       const old = JSON.parse(localStorage.getItem('yams-app-pages-v6.1-table') || 'null');
       if (old && Array.isArray(old.players)){
@@ -127,9 +113,9 @@
         old.players.forEach(p => {
           const pid = p.id || crypto.randomUUID();
           scores[pid] = {};
-          ALL_CATS.forEach(c => {
+          [...CATS_UPPER, ...CATS_LOWER].forEach(c => {
             let v = (p.scores && p.scores[c.key] != null) ? p.scores[c.key] : '';
-            if (typeof v === 'object' && v){ // already blocked/score
+            if (typeof v === 'object' && v){
               scores[pid][c.key] = { score: Number(v.score)||'', blocked: !!v.blocked };
             } else {
               const n = (v === '' || v == null) ? '' : Number(v)||0;
@@ -148,13 +134,12 @@
     return fresh;
   }
   function migrateState(st){
-    // Ensure each pid & cat has {score,blocked}
     st.players = st.players || [];
     st.scores = st.scores || {};
     st.players.forEach(p => {
       if (!p.id) p.id = crypto.randomUUID?.() || String(Date.now())+Math.random();
       if (!st.scores[p.id]) st.scores[p.id] = {};
-      ALL_CATS.forEach(c => {
+      [...CATS_UPPER, ...CATS_LOWER].forEach(c => {
         const cur = st.scores[p.id][c.key];
         if (!cur || typeof cur !== 'object'){
           const num = (cur===''||cur==null) ? '' : Number(cur)||0;
@@ -168,11 +153,9 @@
     return st;
   }
   function saveState(){ localStorage.setItem(STATE_KEY, JSON.stringify(state)); }
-
   function loadRounds(){
     let r = [];
     try{ r = JSON.parse(localStorage.getItem(ROUNDS_KEY) || '[]'); }catch{}
-    // retro-compat: if scores missing blocked, fill false
     r.forEach(R => {
       if (!R.scores) return;
       Object.keys(R.scores).forEach(pid => {
@@ -192,13 +175,10 @@
   }
   function saveRounds(){ localStorage.setItem(ROUNDS_KEY, JSON.stringify(rounds)); }
 
-  // ------------------ Validation ------------------
   function isUpperKey(k){ return !!CATS_UPPER.find(c => c.key===k); }
   function upperBase(k){ const c = CATS_UPPER.find(c=>c.key===k); return c ? c.base : 0; }
-
   function allowedUpperValues(base){ return [0, base, 2*base, 3*base, 4*base, 5*base]; }
 
-  // Returns {valid:boolean, normalized:number}
   function validateValue(key, raw){
     if (raw === '' || raw == null) return { valid:true, normalized:'' };
     let n = Number(raw);
@@ -214,7 +194,6 @@
     if (key==='smallStr')   return { valid: (n===0 || n===30),  normalized: (n===30?30:0) };
     if (key==='largeStr')   return { valid: (n===0 || n===40),  normalized: (n===40?40:0) };
     if (key==='yahtzee')    return { valid: (n===0 || n===50),  normalized: (n===50?50:0) };
-    // Brelan / Carré / Chance: 0 ou [5..30]
     if (key==='threeKind' || key==='fourKind' || key==='chance'){
       if (n===0) return { valid:true, normalized:0 };
       const clamped = clamp(Math.round(n), 5, 30);
@@ -224,36 +203,26 @@
     return { valid:true, normalized:n };
   }
 
-  // ------------------ Totals ------------------
   function upperSum(pid){
-    let s = 0;
-    CATS_UPPER.forEach(c => { const v = state.scores[pid]?.[c.key]?.score || 0; s += Number(v)||0; });
+    let s = 0; CATS_UPPER.forEach(c => { const v = state.scores[pid]?.[c.key]?.score || 0; s += Number(v)||0; });
     return s;
   }
   function lowerSum(pid){
-    let s = 0;
-    CATS_LOWER.forEach(c => { const v = state.scores[pid]?.[c.key]?.score || 0; s += Number(v)||0; });
+    let s = 0; CATS_LOWER.forEach(c => { const v = state.scores[pid]?.[c.key]?.score || 0; s += Number(v)||0; });
     return s;
   }
   function bonus63(u){ return u>=63 ? 35 : 0; }
   function totalsFor(pid){
-    const u = upperSum(pid);
-    const b = bonus63(u);
-    const l = lowerSum(pid);
+    const u = upperSum(pid), b = bonus63(u), l = lowerSum(pid);
     return { upper:u, bonus:b, lower:l, total:u+b+l };
   }
-
   function countFilled(pid){
-    let c=0;
-    ALL_CATS.forEach(ca => { const v = state.scores[pid]?.[ca.key]; if (v && v.score!=='' && !v.blocked) c++; });
+    let c=0; [...CATS_UPPER, ...CATS_LOWER].forEach(ca => { const v = state.scores[pid]?.[ca.key]; if (v && v.score!=='' && !v.blocked) c++; });
     return c;
   }
 
-  // ------------------ DOM build ------------------
-  const thead = $('#thead');
-  const tbody = $('#tbody');
-  const lbList = $('#lbList');
-  const lbView = $('#lbView');
+  const thead = $('#thead'), tbody = $('#tbody');
+  const lbList = $('#lbList'), lbView = $('#lbView');
 
   function buildTable(){
     thead.innerHTML = '';
@@ -289,11 +258,10 @@
       });
       trHead.appendChild(th);
       if (!state.scores[p.id]) state.scores[p.id] = {};
-      ALL_CATS.forEach(c => { if (!state.scores[p.id][c.key]) state.scores[p.id][c.key] = emptyScore(); });
+      [...CATS_UPPER, ...CATS_LOWER].forEach(c => { if (!state.scores[p.id][c.key]) state.scores[p.id][c.key] = emptyScore(); });
     });
     thead.appendChild(trHead);
 
-    // Body
     tbody.innerHTML = '';
     function addRow(label, key, className, isLast){
       const tr = document.createElement('tr'); if (isLast) tr.classList.add('last-row');
@@ -310,13 +278,11 @@
           setBlockVisual(td, cur.blocked);
 
           input.addEventListener('input', ()=>{
-            // enforce digits only
             const digits = input.value.replace(/[^\d]/g,'');
             if (digits !== input.value) input.value = digits;
             const val = digits === '' ? '' : Number(digits)||0;
             const { valid } = validateValue(key, val === '' ? '' : val);
             markValidity(input, val, valid, cur.blocked);
-            // live store raw number (not normalized yet), unless blocked
             if (!cur.blocked){
               state.scores[p.id][key].score = (digits === '' ? '' : Number(digits));
               saveState(); refreshComputedFor(p.id); renderLeaderboard();
@@ -332,10 +298,8 @@
             saveState(); refreshComputedFor(p.id); renderLeaderboard();
           });
 
-          // Blocking gestures
-          installBlockGestures(td, ()=> toggleBlock(p.id, key));
-
           td.appendChild(input);
+          installBlockGestures(td, ()=> toggleBlock(p.id, key)); // -> après appendChild
         } else { td.textContent = ''; }
         tr.appendChild(td);
       });
@@ -367,7 +331,6 @@
       input.tabIndex = blocked ? -1 : 0;
     }
   }
-
   function updateFillClasses(input, cur){
     if (cur.blocked){ input.classList.remove('is-empty','is-filled','is-invalid'); return; }
     const val = input.value;
@@ -381,33 +344,52 @@
     else { input.classList.remove('is-invalid'); if (Number(value)>0) input.classList.add('is-filled'); else input.classList.remove('is-filled'); }
   }
 
-  // Double click + long press + double tap
-  function installBlockGestures(el, onToggle){
-    // dblclick for mouse
-    el.addEventListener('dblclick', (e)=>{ e.preventDefault(); onToggle(); });
-    // long press 600ms
-    let t=null, startX=0, startY=0, lastTap=0;
-    const LONG_MS = 600, TAP_MS = 300, MOVE_TOL=10;
-    el.addEventListener('pointerdown', (e)=>{
-      if (e.pointerType === 'mouse') return;
-      startX = e.clientX; startY = e.clientY;
-      t = setTimeout(()=>{ onToggle(); t=null; }, LONG_MS);
-    });
-    const clear = ()=>{ if (t){ clearTimeout(t); t=null; } };
-    el.addEventListener('pointermove', (e)=>{
-      if (!t) return;
-      if (Math.hypot(e.clientX-startX, e.clientY-startY) > MOVE_TOL) clear();
-    });
-    el.addEventListener('pointerup', (e)=>{
-      if (t){ // treat as tap
-        clear();
-        const now = performance.now();
-        if (now - lastTap < TAP_MS){ onToggle(); lastTap = 0; }
-        else lastTap = now;
-      }
-    });
-    el.addEventListener('pointercancel', clear);
-    el.addEventListener('pointerleave', clear);
+  // Gestes : iPhone/iPad — double-tap partout (y compris sur l'input) + long-press
+  function installBlockGestures(td, onToggle){
+    let lastTap=0, startX=0, startY=0, pressTimer=null, ignoreUntil=0;
+    const DOUBLE_MS=300, LONG_MS=650, MOVE_TOL=12, COOLDOWN=380;
+
+    const onToggleSafe = ()=>{
+      const now = performance.now();
+      if (now < ignoreUntil) return;         // évite le double déclenchement (tap + dblclick)
+      onToggle();
+      ignoreUntil = now + COOLDOWN;
+    };
+
+    const bind = (el)=>{
+      // Desktop souris : dblclick
+      el.addEventListener('dblclick', (e)=>{ e.preventDefault(); onToggleSafe(); });
+
+      // Touch/pencil : double-tap + long-press
+      el.addEventListener('pointerdown', (e)=>{
+        if (e.pointerType === 'mouse') return;
+        startX = e.clientX; startY = e.clientY;
+        // timer de long-press
+        pressTimer = setTimeout(()=>{ pressTimer=null; onToggleSafe(); }, LONG_MS);
+      }, {passive:true});
+
+      el.addEventListener('pointermove', (e)=>{
+        if (!pressTimer) return;
+        if (Math.hypot(e.clientX-startX, e.clientY-startY) > MOVE_TOL){
+          clearTimeout(pressTimer); pressTimer=null;
+        }
+      }, {passive:true});
+
+      el.addEventListener('pointerup', (e)=>{
+        if (pressTimer){ // traité comme tap / double-tap
+          clearTimeout(pressTimer); pressTimer=null;
+          const now = performance.now();
+          if (now - lastTap < DOUBLE_MS){ onToggleSafe(); lastTap = 0; }
+          else { lastTap = now; }
+        }
+      });
+
+      // Évite menu contextuel iOS au long-press
+      el.addEventListener('contextmenu', (e)=> e.preventDefault());
+    };
+
+    bind(td);
+    const inp = td.querySelector('input'); if (inp) bind(inp);
   }
 
   function toggleBlock(pid, key){
@@ -416,13 +398,9 @@
     const input = td?.querySelector('input');
     if (!cur || !td || !input) return;
     if (!cur.blocked){
-      // block
-      cur.blocked = true;
-      cur.score = 0;
-      input.value = '';
+      cur.blocked = true; cur.score = 0; input.value = '';
     } else {
       cur.blocked = false;
-      // keep score 0 (user can edit now)
     }
     setBlockVisual(td, cur.blocked);
     updateFillClasses(input, cur);
@@ -449,7 +427,6 @@
     setCellText(totalRow,    colIdx, t.total, 'total-row');
   }
 
-  // ------------------ Leaderboard ------------------
   function renderLeaderboard(){
     const view = lbView.value;
     lbList.innerHTML = '';
@@ -479,7 +456,6 @@
     return wins;
   }
 
-  // ------------------ History ------------------
   const historyModal = $('#historyModal');
   const historyList = $('#historyList');
   $('#openHistoryBtn').addEventListener('click', ()=>{ renderHistory(); $('#backdrop').classList.add('open'); historyModal.classList.add('open'); });
@@ -505,27 +481,22 @@
     }
   }
 
-  // ------------------ Round button ------------------
   $('#roundToggleBtn').addEventListener('click', ()=>{
     if (!state.players.length){ alert('Aucun joueur.'); return; }
-    // Build totals and deep copy scores (with blocked)
     const totalsMap = {}; const scoresMap = {};
     state.players.forEach(p => {
       totalsMap[p.id] = totalsFor(p.id).total;
       scoresMap[p.id] = {};
-      ALL_CATS.forEach(c => { scoresMap[p.id][c.key] = { score: Number(state.scores[p.id][c.key].score)||0, blocked: !!state.scores[p.id][c.key].blocked }; });
+      [...CATS_UPPER, ...CATS_LOWER].forEach(c => { scoresMap[p.id][c.key] = { score: Number(state.scores[p.id][c.key].score)||0, blocked: !!state.scores[p.id][c.key].blocked }; });
     });
     rounds.push({ time: new Date().toISOString(), totals: totalsMap, scores: scoresMap });
     saveRounds();
     alert('Manche clôturée et enregistrée ! Nouvelle manche lancée.');
-
-    // Reset all scores & blocks
-    state.players.forEach(p => { ALL_CATS.forEach(c => { state.scores[p.id][c.key] = emptyScore(); }); });
+    state.players.forEach(p => { [...CATS_UPPER, ...CATS_LOWER].forEach(c => { state.scores[p.id][c.key] = emptyScore(); }); });
     saveState(); buildTable(); renderLeaderboard();
     window.__roundDates = rounds.map(r => r.time);
   });
 
-  // ------------------ Stats (per player) ------------------
   const playerStatsModal = $('#playerStatsModal');
   const playerStatsContent = $('#playerStatsContent');
   $('#closePlayerStats').addEventListener('click', ()=>{ $('#backdrop').classList.remove('open'); playerStatsModal.classList.remove('open'); });
@@ -613,7 +584,7 @@
     const rank = (currentSorted.findIndex(x => x.id===pid) + 1) || '-';
     const leader = currentSorted[0]; const me = currentSorted.find(x => x.id===pid) || {total:0};
     const diffLeader = leader ? (leader.total - me.total) : 0;
-    const filled = countFilled(pid); const totalCells = ALL_CATS.length;
+    const filled = countFilled(pid); const totalCells = [...CATS_UPPER, ...CATS_LOWER].length;
     const up = cur.upper, lo = cur.lower, bon = cur.bonus, need = Math.max(0, 63 - upperSum(pid));
 
     const all = statsAllRoundsFor(pid);
@@ -651,11 +622,10 @@
     $('#backdrop').classList.add('open'); $('#playerStatsModal').classList.add('open');
   }
 
-  // ------------------ Export / Import / PDF ------------------
   $('#exportBtn').addEventListener('click', ()=>{
     const normalized = state.players.map(p => ({
       playerId: p.id, name: p.name||'Joueur',
-      categories: Object.fromEntries(ALL_CATS.map(c => [c.key, { score: Number(state.scores[p.id][c.key].score)||0, blocked: !!state.scores[p.id][c.key].blocked }]))
+      categories: Object.fromEntries([...CATS_UPPER, ...CATS_LOWER].map(c => [c.key, { score: Number(state.scores[p.id][c.key].score)||0, blocked: !!state.scores[p.id][c.key].blocked }]))
     }));
     const payload = { version: VERSION, state, rounds, export_normalise: normalized };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
@@ -673,7 +643,6 @@
     reader.onload = ()=>{
       try{
         const data = JSON.parse(String(reader.result));
-        // accept both {state,rounds} or legacy {etat,historique_manches}
         const st = data.state || data.etat;
         const rd = data.rounds || data.historique_manches || [];
         if (!st || !Array.isArray(st.players)) throw new Error('Format invalide');
@@ -705,7 +674,6 @@
     const players = state.players.slice();
     window.__roundDates = rounds.map(r => r.time);
 
-    // Totaux par partie (only closed rounds = all in rounds)
     let head = `<tr><th>Partie</th>${players.map(p=>`<th>${escapeHtml(p.name||'Joueur')}</th>`).join('')}</tr>`;
     let rowsHtml = "";
     rounds.forEach((r,i)=>{
@@ -716,12 +684,11 @@
     if (!rowsHtml) rowsHtml = `<tr><td colspan="${players.length+1}"><em>Aucune partie</em></td></tr>`;
     wrapRounds.innerHTML = `<table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%">${head}${rowsHtml}</table>`;
 
-    // Détail par manche
     let detailAll = "";
     rounds.forEach((R, rIdx)=>{
       const header = `<tr><th>Catégorie</th>${players.map(p=>`<th>${escapeHtml(p.name||'Joueur')}</th>`).join('')}</tr>`;
       let rowsD = "";
-      ALL_CATS.forEach(cat => {
+      [...CATS_UPPER, ...CATS_LOWER].forEach(cat => {
         let tds='';
         players.forEach(p => {
           const cell = (R.scores && R.scores[p.id] && R.scores[p.id][cat.key]) ? R.scores[p.id][cat.key] : {score:'',blocked:false};
@@ -733,9 +700,8 @@
       detailAll += `<div style="margin:10px 0;page-break-inside:avoid"><strong>Partie ${rIdx+1} — ${ new Date(R.time).toLocaleString() }</strong><br>
                    <table border="1" cellspacing="0" cellpadding="4" style="border-collapse:collapse;width:100%">${header}${rowsD}</table></div>`;
     });
-    wrapRoundDetails.innerHTML = detailAll || "<em>Aucune partie</em>";
+    $('#printRoundDetails').innerHTML = detailAll || "<em>Aucune partie</em>";
 
-    // Stats cartes joueurs
     let statsHtml = "";
     state.players.forEach(p => {
       const all = statsAllRoundsFor(p.id); const svg = makeChart(all.scores, 'Numéro de manche (date)', 'Score total');
@@ -758,10 +724,9 @@
         </div>
       </div>`;
     });
-    wrapPlayers.innerHTML = statsHtml;
+    $('#printPlayers').innerHTML = statsHtml;
   }
 
-  // ------------------ Toolbar & Settings ------------------
   $('#addPlayerBtn').addEventListener('click', ()=>{
     const nameInput = $('#playerName');
     const name = (nameInput.value||'').trim();
@@ -769,7 +734,7 @@
     if (nameExists(name)){ alert('Ce prénom existe déjà.'); return; }
     const pid = crypto.randomUUID?.() || (String(Date.now())+Math.random());
     state.players.push({ id: pid, name });
-    state.scores[pid] = {}; ALL_CATS.forEach(c => state.scores[pid][c.key] = emptyScore());
+    state.scores[pid] = {}; [...CATS_UPPER, ...CATS_LOWER].forEach(c => state.scores[pid][c.key] = emptyScore());
     saveState(); buildTable(); renderLeaderboard();
     nameInput.value = '';
   });
@@ -785,7 +750,6 @@
   closeSettings.addEventListener('click', closeSettingsModal);
   backdrop.addEventListener('click', ()=>{ closeSettingsModal(); $('#historyModal').classList.remove('open'); $('#playerStatsModal').classList.remove('open'); });
 
-  // Clear caches + unregister SW
   $('#clearCacheBtn').addEventListener('click', async ()=>{
     try{
       const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k)));
@@ -794,11 +758,9 @@
     }catch(e){ alert('Impossible de vider les caches : ' + e.message); }
   });
 
-  // ------------------ Init ------------------
   buildTable(); renderLeaderboard();
   window.__roundDates = rounds.map(r => r.time);
 
-  // ------------------ Service Worker ------------------
   if ('serviceWorker' in navigator){
     window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js'));
   }

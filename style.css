@@ -64,21 +64,37 @@ th.player{ min-width: var(--col-min); }
 .player-head{ display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap; }
 .player-head .name{ font-weight:700; text-align:center; }
 .player-head button{ min-height:30px; padding:6px 8px; font-size:.9rem; }
-.cell{ text-align: center; position: relative; overflow:hidden; }
+.cell{ text-align: center; position: relative; overflow:hidden; touch-action: manipulation; }
 .cell input{ width: var(--input-w); text-align:center; min-height:34px; margin: 0 auto; display:block; }
 .cell input.is-empty{ background: var(--danger); border-color: var(--danger-border); }
 .cell input.is-filled{ background: var(--success); border-color: var(--success-border); }
 .cell input.is-invalid{ background: var(--warn); border-color: var(--warn-border); }
 
-/* Barrage — croix centrée et confinée dans la cellule */
-.cell.blocked{
-  --xw: 2px;
-  background-image:
-    linear-gradient(45deg, transparent calc(50% - var(--xw)), #ef4444 calc(50% - var(--xw)), #ef4444 calc(50% + var(--xw)), transparent calc(50% + var(--xw))),
-    linear-gradient(-45deg, transparent calc(50% - var(--xw)), #ef4444 calc(50% - var(--xw)), #ef4444 calc(50% + var(--xw)), transparent calc(50% + var(--xw)));
-  background-repeat: no-repeat, no-repeat;
-  background-size: 100% 100%, 100% 100%;
-  background-position: center center, center center;
+/* Barrage — croix depuis les angles, sans toucher les bords */
+.cell.blocked{ --xpad:6px; --xw:2px; }
+.cell.blocked::before,
+.cell.blocked::after{
+  content:""; position:absolute; pointer-events:none;
+  top:var(--xpad); left:var(--xpad); right:var(--xpad); bottom:var(--xpad);
+  background-repeat:no-repeat; background-size:100% 100%;
+}
+.cell.blocked::before{
+  background-image: linear-gradient(
+    45deg,
+    transparent calc(50% - var(--xw)),
+    #ef4444   calc(50% - var(--xw)),
+    #ef4444   calc(50% + var(--xw)),
+    transparent calc(50% + var(--xw))
+  );
+}
+.cell.blocked::after{
+  background-image: linear-gradient(
+    -45deg,
+    transparent calc(50% - var(--xw)),
+    #ef4444   calc(50% - var(--xw)),
+    #ef4444   calc(50% + var(--xw)),
+    transparent calc(50% + var(--xw))
+  );
 }
 .cell.blocked input{ background: transparent !important; color: var(--text); opacity:.6; pointer-events:none; }
 
